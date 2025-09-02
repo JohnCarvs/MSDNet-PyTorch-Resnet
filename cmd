@@ -1,0 +1,15 @@
+
+
+python main.py --data-root ./data --data cifar100 --save ./save --arch msdnet --usingsdn 0 --batch-size 64 --epochs 300 --nBlocks 7 --stepmode even --step 2 --base 4 --nChannels 16 -j 4
+
+
+
+
+
+# ['vgg16','resnet56','wideresnet32_4','mobilenet']
+python main.py --data-root "./data" --save ./save --usingsdn 1 --data cifar100 --task cifar100 --sdnarch "resnet56" --batch-size 64 --epochs 300 --seed 0 --lr 0.1 --use-valid --predefinedindex "/home/user/ECCV_version_MetaGF/A0index/Cifar100/resnet/index.pth" -j 4
+
+
+
+
+

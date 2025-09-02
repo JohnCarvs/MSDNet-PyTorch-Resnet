@@ -14,6 +14,7 @@ from dataloader import get_dataloaders
 from args import arg_parser
 from adaptive_inference import dynamic_evaluate
 import models
+from models.SDN_Constructing import SDN
 from op_counter import measure_model
 
 args = arg_parser.parse_args()
@@ -58,13 +59,21 @@ def main():
     else:
         IM_SIZE = 224
 
-    model = getattr(models, args.arch)(args)
+    if args.usingsdn:
+        model = SDN(args)
+    else:
+        model = getattr(models, args.arch)(args)
+
     n_flops, n_params = measure_model(model, IM_SIZE, IM_SIZE)    
     torch.save(n_flops, os.path.join(args.save, 'flops.pth'))
     del(model)
-        
-        
-    model = getattr(models, args.arch)(args)
+
+
+    if args.usingsdn:
+        model = SDN(args)
+    else:
+        model = getattr(models, args.arch)(args)
+
 
     if args.arch.startswith('alexnet') or args.arch.startswith('vgg'):
         model.features = torch.nn.DataParallel(model.features)
@@ -166,17 +175,47 @@ def train(train_loader, model, criterion, optimizer, epoch):
         target_var = torch.autograd.Variable(target)
 
         output = model(input_var)
+
+        # gets the actual tensor, instead of a list or tuple
+        def get_tensor(x):
+            while isinstance(x, (list, tuple)):
+                x = x[0]
+            return x
+
+
+        if isinstance(output, tuple):
+            output = output[0]
+
+
         if not isinstance(output, list):
             output = [output]
 
+
+        #print("DEBUG: model output type:", type(output))
+        #print("DEBUG: model output value:", output)
+        #if not isinstance(output, list):
+        #    output = [output]
+        #print("DEBUG: output after list cast:", output)
+        #for idx, out in enumerate(output):
+        #    print(f"DEBUG: output[{idx}] type: {type(out)}, value: {out}")
+
+
         loss = 0.0
         for j in range(len(output)):
-            loss += criterion(output[j], target_var)
+            #loss += criterion(output[j], target_var)
+
+
+            logits = get_tensor(output[j])
+            loss += criterion(logits, target_var)
 
         losses.update(loss.item(), input.size(0))
 
         for j in range(len(output)):
-            prec1, prec5 = accuracy(output[j].data, target, topk=(1, 5))
+            #prec1, prec5 = accuracy(output[j].data, target, topk=(1, 5))
+
+            logits = get_tensor(output[j])
+            prec1, prec5 = accuracy(logits.data, target, topk=(1, 5))
+
             top1[j].update(prec1.item(), input.size(0))
             top5[j].update(prec5.item(), input.size(0))
 
@@ -211,6 +250,11 @@ def validate(val_loader, model, criterion):
         top1.append(AverageMeter())
         top5.append(AverageMeter())
 
+    def get_tensor(x):
+        while isinstance(x, (list, tuple)):
+            x = x[0]
+        return x
+
     model.eval()
 
     end = time.time()
@@ -225,6 +269,10 @@ def validate(val_loader, model, criterion):
             data_time.update(time.time() - end)
 
             output = model(input_var)
+
+            if isinstance(output, tuple):
+                output = output[0]
+
             if not isinstance(output, list):
                 output = [output]
 
@@ -235,7 +283,11 @@ def validate(val_loader, model, criterion):
             losses.update(loss.item(), input.size(0))
 
             for j in range(len(output)):
-                prec1, prec5 = accuracy(output[j].data, target, topk=(1, 5))
+                #prec1, prec5 = accuracy(output[j].data, target, topk=(1, 5))
+
+                logits = get_tensor(output[j])
+                prec1, prec5 = accuracy(logits.data, target, topk=(1, 5))
+
                 top1[j].update(prec1.item(), input.size(0))
                 top5[j].update(prec5.item(), input.size(0))
 
