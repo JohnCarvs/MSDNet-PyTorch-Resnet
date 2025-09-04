@@ -111,3 +111,6 @@ cifar-100-python/*
 cifar-100-python.*
 
 .DS_Store
+
+# save checkpoints
+save/*
