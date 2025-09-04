@@ -10,22 +10,14 @@ def get_dataloaders(args):
     if args.data == 'cifar10':
         normalize = transforms.Normalize(mean=[0.4914, 0.4824, 0.4467],
                                          std=[0.2471, 0.2435, 0.2616])
-<<<<<<< HEAD
         train_set = datasets.CIFAR10(args.data_root, train=True, download=True,
-=======
-        train_set = datasets.CIFAR10(args.data_root, train=True,
->>>>>>> f654595270cef1f7555a82af41c38d6f581e7e16
                                      transform=transforms.Compose([
                                         transforms.RandomCrop(32, padding=4),
                                         transforms.RandomHorizontalFlip(),
                                         transforms.ToTensor(),
                                         normalize
                                      ]))
-<<<<<<< HEAD
         val_set = datasets.CIFAR10(args.data_root, train=False, download=True,
-=======
-        val_set = datasets.CIFAR10(args.data_root, train=False,
->>>>>>> f654595270cef1f7555a82af41c38d6f581e7e16
                                    transform=transforms.Compose([
                                     transforms.ToTensor(),
                                     normalize
@@ -33,22 +25,14 @@ def get_dataloaders(args):
     elif args.data == 'cifar100':
         normalize = transforms.Normalize(mean=[0.5071, 0.4867, 0.4408],
                                          std=[0.2675, 0.2565, 0.2761])
-<<<<<<< HEAD
         train_set = datasets.CIFAR100(args.data_root, train=True, download=True,
-=======
-        train_set = datasets.CIFAR100(args.data_root, train=True,
->>>>>>> f654595270cef1f7555a82af41c38d6f581e7e16
                                       transform=transforms.Compose([
                                         transforms.RandomCrop(32, padding=4),
                                         transforms.RandomHorizontalFlip(),
                                         transforms.ToTensor(),
                                         normalize
                                       ]))
-<<<<<<< HEAD
         val_set = datasets.CIFAR100(args.data_root, train=False, download=True,
-=======
-        val_set = datasets.CIFAR100(args.data_root, train=False,
->>>>>>> f654595270cef1f7555a82af41c38d6f581e7e16
                                     transform=transforms.Compose([
                                         transforms.ToTensor(),
                                         normalize

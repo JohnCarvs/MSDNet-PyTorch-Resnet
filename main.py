@@ -9,19 +9,13 @@ import sys
 import math
 import time
 import shutil
-<<<<<<< HEAD
 import numpy as np
-=======
->>>>>>> f654595270cef1f7555a82af41c38d6f581e7e16
 
 from dataloader import get_dataloaders
 from args import arg_parser
 from adaptive_inference import dynamic_evaluate
 import models
-<<<<<<< HEAD
 from models.SDN_Constructing import SDN
-=======
->>>>>>> f654595270cef1f7555a82af41c38d6f581e7e16
 from op_counter import measure_model
 
 args = arg_parser.parse_args()
@@ -66,7 +60,6 @@ def main():
     else:
         IM_SIZE = 224
 
-<<<<<<< HEAD
     if args.usingsdn:
         model = SDN(args)
     else:
@@ -82,15 +75,6 @@ def main():
     else:
         model = getattr(models, args.arch)(args)
 
-=======
-    model = getattr(models, args.arch)(args)
-    n_flops, n_params = measure_model(model, IM_SIZE, IM_SIZE)    
-    torch.save(n_flops, os.path.join(args.save, 'flops.pth'))
-    del(model)
-        
-        
-    model = getattr(models, args.arch)(args)
->>>>>>> f654595270cef1f7555a82af41c38d6f581e7e16
 
     if args.arch.startswith('alexnet') or args.arch.startswith('vgg'):
         model.features = torch.nn.DataParallel(model.features)
@@ -163,10 +147,7 @@ def main():
 
     return 
 
-<<<<<<< HEAD
 '''
-=======
->>>>>>> f654595270cef1f7555a82af41c38d6f581e7e16
 def train(train_loader, model, criterion, optimizer, epoch):
     batch_time = AverageMeter()
     data_time = AverageMeter()
@@ -196,7 +177,6 @@ def train(train_loader, model, criterion, optimizer, epoch):
         target_var = torch.autograd.Variable(target)
 
         output = model(input_var)
-<<<<<<< HEAD
 
         # gets the actual tensor, instead of a list or tuple
         def get_tensor(x):
@@ -229,27 +209,15 @@ def train(train_loader, model, criterion, optimizer, epoch):
 
             logits = get_tensor(output[j])
             loss += criterion(logits, target_var)
-=======
-        if not isinstance(output, list):
-            output = [output]
-
-        loss = 0.0
-        for j in range(len(output)):
-            loss += criterion(output[j], target_var)
->>>>>>> f654595270cef1f7555a82af41c38d6f581e7e16
 
         losses.update(loss.item(), input.size(0))
 
         for j in range(len(output)):
-<<<<<<< HEAD
             #prec1, prec5 = accuracy(output[j].data, target, topk=(1, 5))
 
             logits = get_tensor(output[j])
             prec1, prec5 = accuracy(logits.data, target, topk=(1, 5))
 
-=======
-            prec1, prec5 = accuracy(output[j].data, target, topk=(1, 5))
->>>>>>> f654595270cef1f7555a82af41c38d6f581e7e16
             top1[j].update(prec1.item(), input.size(0))
             top5[j].update(prec5.item(), input.size(0))
 
@@ -274,7 +242,6 @@ def train(train_loader, model, criterion, optimizer, epoch):
                     loss=losses, top1=top1[-1], top5=top5[-1]))
 
     return losses.avg, top1[-1].avg, top5[-1].avg, running_lr
-<<<<<<< HEAD
 '''
 
 def train(train_loader, model, criterion, optimizer, epoch):
@@ -367,9 +334,6 @@ def train(train_loader, model, criterion, optimizer, epoch):
 
     return losses.avg, top1[-1].avg, top5[-1].avg, running_lr
 '''
-=======
-
->>>>>>> f654595270cef1f7555a82af41c38d6f581e7e16
 def validate(val_loader, model, criterion):
     batch_time = AverageMeter()
     losses = AverageMeter()
@@ -379,14 +343,11 @@ def validate(val_loader, model, criterion):
         top1.append(AverageMeter())
         top5.append(AverageMeter())
 
-<<<<<<< HEAD
     def get_tensor(x):
         while isinstance(x, (list, tuple)):
             x = x[0]
         return x
 
-=======
->>>>>>> f654595270cef1f7555a82af41c38d6f581e7e16
     model.eval()
 
     end = time.time()
@@ -401,13 +362,10 @@ def validate(val_loader, model, criterion):
             data_time.update(time.time() - end)
 
             output = model(input_var)
-<<<<<<< HEAD
 
             if isinstance(output, tuple):
                 output = output[0]
 
-=======
->>>>>>> f654595270cef1f7555a82af41c38d6f581e7e16
             if not isinstance(output, list):
                 output = [output]
 
@@ -418,15 +376,11 @@ def validate(val_loader, model, criterion):
             losses.update(loss.item(), input.size(0))
 
             for j in range(len(output)):
-<<<<<<< HEAD
                 #prec1, prec5 = accuracy(output[j].data, target, topk=(1, 5))
 
                 logits = get_tensor(output[j])
                 prec1, prec5 = accuracy(logits.data, target, topk=(1, 5))
 
-=======
-                prec1, prec5 = accuracy(output[j].data, target, topk=(1, 5))
->>>>>>> f654595270cef1f7555a82af41c38d6f581e7e16
                 top1[j].update(prec1.item(), input.size(0))
                 top5[j].update(prec5.item(), input.size(0))
 
@@ -448,7 +402,6 @@ def validate(val_loader, model, criterion):
         print(' * prec@1 {top1.avg:.3f} prec@5 {top5.avg:.3f}'.format(top1=top1[j], top5=top5[j]))
     # print(' * prec@1 {top1.avg:.3f} prec@5 {top5.avg:.3f}'.format(top1=top1[-1], top5=top5[-1]))
     return losses.avg, top1[-1].avg, top5[-1].avg
-<<<<<<< HEAD
 '''
 def validate(val_loader, model, criterion):
     batch_time = AverageMeter()
@@ -515,8 +468,6 @@ def validate(val_loader, model, criterion):
     # print(' * Err@1 {top1.avg:.3f} Err@5 {top5.avg:.3f}'.format(top1=top1[-1], top5=top5[-1]))
     return losses.avg, top1[-1].avg, top5[-1].avg
 
-=======
->>>>>>> f654595270cef1f7555a82af41c38d6f581e7e16
 
 def save_checkpoint(state, args, is_best, filename, result):
     print(args)
