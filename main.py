@@ -147,102 +147,6 @@ def main():
 
     return 
 
-'''
-def train(train_loader, model, criterion, optimizer, epoch):
-    batch_time = AverageMeter()
-    data_time = AverageMeter()
-    losses = AverageMeter()
-    top1, top5 = [], []
-    for i in range(args.nBlocks):
-        top1.append(AverageMeter())
-        top5.append(AverageMeter())
-
-    # switch to train mode
-    model.train()
-
-    end = time.time()
-
-    running_lr = None
-    for i, (input, target) in enumerate(train_loader):
-        lr = adjust_learning_rate(optimizer, epoch, args, batch=i,
-                                  nBatch=len(train_loader), method=args.lr_type)
-
-        if running_lr is None:
-            running_lr = lr
-
-        data_time.update(time.time() - end)
-
-        target = target.cuda(device=None)
-        input_var = torch.autograd.Variable(input)
-        target_var = torch.autograd.Variable(target)
-
-        output = model(input_var)
-
-        # gets the actual tensor, instead of a list or tuple
-        def get_tensor(x):
-            while isinstance(x, (list, tuple)):
-                x = x[0]
-            return x
-
-
-        if isinstance(output, tuple):
-            output = output[0]
-
-
-        if not isinstance(output, list):
-            output = [output]
-
-
-        #print("DEBUG: model output type:", type(output))
-        #print("DEBUG: model output value:", output)
-        #if not isinstance(output, list):
-        #    output = [output]
-        #print("DEBUG: output after list cast:", output)
-        #for idx, out in enumerate(output):
-        #    print(f"DEBUG: output[{idx}] type: {type(out)}, value: {out}")
-
-
-        loss = 0.0
-        for j in range(len(output)):
-            #loss += criterion(output[j], target_var)
-
-
-            logits = get_tensor(output[j])
-            loss += criterion(logits, target_var)
-
-        losses.update(loss.item(), input.size(0))
-
-        for j in range(len(output)):
-            #prec1, prec5 = accuracy(output[j].data, target, topk=(1, 5))
-
-            logits = get_tensor(output[j])
-            prec1, prec5 = accuracy(logits.data, target, topk=(1, 5))
-
-            top1[j].update(prec1.item(), input.size(0))
-            top5[j].update(prec5.item(), input.size(0))
-
-        # compute gradient and do SGD step
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-
-        # measure elapsed time
-        batch_time.update(time.time() - end)
-        end = time.time()
-
-        if i % args.print_freq == 0:
-            print('Epoch: [{0}][{1}/{2}]\t'
-                  'Time {batch_time.avg:.3f}\t'
-                  'Data {data_time.avg:.3f}\t'
-                  'Loss {loss.val:.4f}\t'
-                  'Acc@1 {top1.val:.4f}\t'
-                  'Acc@5 {top5.val:.4f}'.format(
-                    epoch, i + 1, len(train_loader),
-                    batch_time=batch_time, data_time=data_time,
-                    loss=losses, top1=top1[-1], top5=top5[-1]))
-
-    return losses.avg, top1[-1].avg, top5[-1].avg, running_lr
-'''
 
 def train(train_loader, model, criterion, optimizer, epoch):
     batch_time = AverageMeter()
@@ -260,6 +164,21 @@ def train(train_loader, model, criterion, optimizer, epoch):
 
     end = time.time()
 
+    '''
+    batch_time = AverageMeter()
+    data_time = AverageMeter()
+    losses = AverageMeter()
+    top1, top5 = [], []
+    for i in range(args.nBlocks):
+        top1.append(AverageMeter())
+        top5.append(AverageMeter())
+
+    # switch to train mode
+    model.train()
+
+    end = time.time()
+    '''
+
     running_lr = None
     for i, (input, target) in enumerate(train_loader):
 
@@ -274,6 +193,22 @@ def train(train_loader, model, criterion, optimizer, epoch):
         target = target.cuda()
         input_var = torch.autograd.Variable(input)
         target_var = torch.autograd.Variable(target)
+
+        '''
+        running_lr = None
+        for i, (input, target) in enumerate(train_loader):
+            lr = adjust_learning_rate(optimizer, epoch, args, batch=i,
+                                      nBatch=len(train_loader), method=args.lr_type)
+
+            if running_lr is None:
+                running_lr = lr
+
+            data_time.update(time.time() - end)
+
+            target = target.cuda(device=None)
+            input_var = torch.autograd.Variable(input)
+            target_var = torch.autograd.Variable(target)
+        '''
 
         # compute output
         output, _ = model(input_var)
@@ -295,13 +230,23 @@ def train(train_loader, model, criterion, optimizer, epoch):
                     tmp = criterion(output[j], target_var)
                 losslist.append(tmp)
         loss = torch.stack(losslist).sum()
+
+        '''
+        output = model(input_var)
+        if not isinstance(output, list):
+            output = [output]
+
+        loss = 0.0
+        for j in range(len(output)):
+            loss += criterion(output[j], target_var)
+        '''
+
         losses.update(loss.item(), input.size(0))
         # print("losslist:{0}".format(torch.stack(losslist).sum()))
         # print("loss:{0}".format(loss))
         '''Recording gradients'''
         Grad_Dictlist = []
-
-
+        
         # measure error and record loss
         losses.update(loss.item(), input.size(0))
         # compute gradient and do SGD step
@@ -321,6 +266,24 @@ def train(train_loader, model, criterion, optimizer, epoch):
         batch_time.update(time.time() - end)
         end = time.time()
 
+        '''
+          losses.update(loss.item(), input.size(0))
+
+        for j in range(len(output)):
+            prec1, prec5 = accuracy(output[j].data, target, topk=(1, 5))
+            top1[j].update(prec1.item(), input.size(0))
+            top5[j].update(prec5.item(), input.size(0))
+
+        # compute gradient and do SGD step
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+        # measure elapsed time
+        batch_time.update(time.time() - end)
+        end = time.time()
+        '''
+
         if i % args.print_freq == 0:
             print('Epoch: [{0}][{1}/{2}]\t'
                   'Time {batch_time.avg:.3f}\t'
@@ -332,7 +295,24 @@ def train(train_loader, model, criterion, optimizer, epoch):
                 batch_time=batch_time, data_time=data_time,
                 loss=losses, top1=top1[-1], top5=top5[-1]))
 
+    '''
+     if i % args.print_freq == 0:
+            print('Epoch: [{0}][{1}/{2}]\t'
+                  'Time {batch_time.avg:.3f}\t'
+                  'Data {data_time.avg:.3f}\t'
+                  'Loss {loss.val:.4f}\t'
+                  'Acc@1 {top1.val:.4f}\t'
+                  'Acc@5 {top5.val:.4f}'.format(
+                    epoch, i + 1, len(train_loader),
+                    batch_time=batch_time, data_time=data_time,
+                    loss=losses, top1=top1[-1], top5=top5[-1]))
+
+    '''
+
     return losses.avg, top1[-1].avg, top5[-1].avg, running_lr
+
+
+
 '''
 def validate(val_loader, model, criterion):
     batch_time = AverageMeter()
@@ -342,11 +322,6 @@ def validate(val_loader, model, criterion):
     for i in range(args.nBlocks):
         top1.append(AverageMeter())
         top5.append(AverageMeter())
-
-    def get_tensor(x):
-        while isinstance(x, (list, tuple)):
-            x = x[0]
-        return x
 
     model.eval()
 
@@ -362,10 +337,6 @@ def validate(val_loader, model, criterion):
             data_time.update(time.time() - end)
 
             output = model(input_var)
-
-            if isinstance(output, tuple):
-                output = output[0]
-
             if not isinstance(output, list):
                 output = [output]
 
@@ -376,11 +347,7 @@ def validate(val_loader, model, criterion):
             losses.update(loss.item(), input.size(0))
 
             for j in range(len(output)):
-                #prec1, prec5 = accuracy(output[j].data, target, topk=(1, 5))
-
-                logits = get_tensor(output[j])
-                prec1, prec5 = accuracy(logits.data, target, topk=(1, 5))
-
+                prec1, prec5 = accuracy(output[j].data, target, topk=(1, 5))
                 top1[j].update(prec1.item(), input.size(0))
                 top5[j].update(prec5.item(), input.size(0))
 
