@@ -152,8 +152,6 @@ def train(train_loader, model, criterion, optimizer, epoch):
     batch_time = AverageMeter()
     data_time = AverageMeter()
     losses = AverageMeter()
-    Conflictloss = AverageMeter()
-    avg_conflictmatrix = AverageMeter()
     top1, top5 = [], []
     for i in range(args.nBlocks):
         top1.append(AverageMeter())
@@ -163,111 +161,37 @@ def train(train_loader, model, criterion, optimizer, epoch):
     model.train()
 
     end = time.time()
-
-    '''
-    batch_time = AverageMeter()
-    data_time = AverageMeter()
-    losses = AverageMeter()
-    top1, top5 = [], []
-    for i in range(args.nBlocks):
-        top1.append(AverageMeter())
-        top5.append(AverageMeter())
-
-    # switch to train mode
-    model.train()
-
-    end = time.time()
-    '''
 
     running_lr = None
     for i, (input, target) in enumerate(train_loader):
-
         lr = adjust_learning_rate(optimizer, epoch, args, batch=i,
                                   nBatch=len(train_loader), method=args.lr_type)
-        # measure data loading time
+
         if running_lr is None:
             running_lr = lr
 
         data_time.update(time.time() - end)
 
-        target = target.cuda()
+        target = target.cuda(device=None)
         input_var = torch.autograd.Variable(input)
         target_var = torch.autograd.Variable(target)
 
-        '''
-        running_lr = None
-        for i, (input, target) in enumerate(train_loader):
-            lr = adjust_learning_rate(optimizer, epoch, args, batch=i,
-                                      nBatch=len(train_loader), method=args.lr_type)
-
-            if running_lr is None:
-                running_lr = lr
-
-            data_time.update(time.time() - end)
-
-            target = target.cuda(device=None)
-            input_var = torch.autograd.Variable(input)
-            target_var = torch.autograd.Variable(target)
-        '''
-
-        # compute output
         output, _ = model(input_var)
-        if not isinstance(output, list):
-            output = [output]
-        losslist = []
-        if not args.usingsdn:
-            for j in range(len(output)):
-                tmp = criterion(output[j], target_var)
-                losslist.append(tmp)
-        else:
-            max_coeffs = np.array([0.15, 0.3, 0.45, 0.6, 0.75, 0.9])  # max tau_i --- C_i values
-            cur_coeffs = 0.01 + epoch * (max_coeffs / args.epochs)  # to calculate the tau at the currect epoch
-            cur_coeffs = np.minimum(max_coeffs, cur_coeffs)
-            for j in range(len(output)):
-                if j < (len(output) - 1):
-                    tmp = float(cur_coeffs[j]) * criterion(output[j], target_var)
-                else:
-                    tmp = criterion(output[j], target_var)
-                losslist.append(tmp)
-        loss = torch.stack(losslist).sum()
-
-        '''
-        output = model(input_var)
         if not isinstance(output, list):
             output = [output]
 
         loss = 0.0
         for j in range(len(output)):
             loss += criterion(output[j], target_var)
-        '''
+
+        # average exit losses to prevent gradient blowup.
+        # At MetaGF, instead of giving each exit equal weight,
+        # it learns adaptive weights that decide how much each exit’s
+        # gradient should contribute. This reduces harmful gradient conflicts between
+        # shallow and deep exits, making it more stable.
+        loss = loss / len(output)
 
         losses.update(loss.item(), input.size(0))
-        # print("losslist:{0}".format(torch.stack(losslist).sum()))
-        # print("loss:{0}".format(loss))
-        '''Recording gradients'''
-        Grad_Dictlist = []
-        
-        # measure error and record loss
-        losses.update(loss.item(), input.size(0))
-        # compute gradient and do SGD step
-
-
-        optimizer.zero_grad()
-        loss.backward(retain_graph=False)
-        optimizer.step()
-
-
-        for j in range(len(output)):
-            err1, err5 = accuracy(output[j].data, target, topk=(1, 5))
-            top1[j].update(err1.item(), input.size(0))
-            top5[j].update(err5.item(), input.size(0))
-
-        # measure elapsed time
-        batch_time.update(time.time() - end)
-        end = time.time()
-
-        '''
-          losses.update(loss.item(), input.size(0))
 
         for j in range(len(output)):
             prec1, prec5 = accuracy(output[j].data, target, topk=(1, 5))
@@ -282,21 +206,8 @@ def train(train_loader, model, criterion, optimizer, epoch):
         # measure elapsed time
         batch_time.update(time.time() - end)
         end = time.time()
-        '''
 
         if i % args.print_freq == 0:
-            print('Epoch: [{0}][{1}/{2}]\t'
-                  'Time {batch_time.avg:.3f}\t'
-                  'Data {data_time.avg:.3f}\t'
-                  'Loss {loss.val:.4f}\t'
-                  'Err@1 {top1.val:.4f}\t'
-                  'Err@5 {top5.val:.4f}'.format(
-                epoch, i + 1, len(train_loader),
-                batch_time=batch_time, data_time=data_time,
-                loss=losses, top1=top1[-1], top5=top5[-1]))
-
-    '''
-     if i % args.print_freq == 0:
             print('Epoch: [{0}][{1}/{2}]\t'
                   'Time {batch_time.avg:.3f}\t'
                   'Data {data_time.avg:.3f}\t'
@@ -307,9 +218,8 @@ def train(train_loader, model, criterion, optimizer, epoch):
                     batch_time=batch_time, data_time=data_time,
                     loss=losses, top1=top1[-1], top5=top5[-1]))
 
-    '''
-
     return losses.avg, top1[-1].avg, top5[-1].avg, running_lr
+
 
 
 
