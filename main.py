@@ -302,7 +302,7 @@ def validate(val_loader, model, criterion):
 
             data_time.update(time.time() - end)
 
-            output = model(input_var)
+            output, _ = model(input_var)
             if not isinstance(output, list):
                 output = [output]
 
