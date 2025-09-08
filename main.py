@@ -289,13 +289,12 @@ def validate(val_loader, model, criterion):
         top1.append(AverageMeter())
         top5.append(AverageMeter())
 
-    # switch to evaluate mode
     model.eval()
 
     end = time.time()
     with torch.no_grad():
         for i, (input, target) in enumerate(val_loader):
-            target = target.cuda()
+            target = target.cuda(device=None)
             input = input.cuda()
 
             input_var = torch.autograd.Variable(input)
@@ -303,21 +302,20 @@ def validate(val_loader, model, criterion):
 
             data_time.update(time.time() - end)
 
-            # compute output
-            output, _ = model(input_var)
+            output = model(input_var)
             if not isinstance(output, list):
                 output = [output]
 
             loss = 0.0
             for j in range(len(output)):
                 loss += criterion(output[j], target_var)
-            # measure error and record loss
+
             losses.update(loss.item(), input.size(0))
 
             for j in range(len(output)):
-                err1, err5 = accuracy(output[j].data, target, topk=(1, 5))
-                top1[j].update(err1.item(), input.size(0))
-                top5[j].update(err5.item(), input.size(0))
+                prec1, prec5 = accuracy(output[j].data, target, topk=(1, 5))
+                top1[j].update(prec1.item(), input.size(0))
+                top5[j].update(prec5.item(), input.size(0))
 
             # measure elapsed time
             batch_time.update(time.time() - end)
@@ -328,22 +326,40 @@ def validate(val_loader, model, criterion):
                       'Time {batch_time.avg:.3f}\t'
                       'Data {data_time.avg:.3f}\t'
                       'Loss {loss.val:.4f}\t'
-                      'Err@1 {top1.val:.4f}\t'
-                      'Err@5 {top5.val:.4f}'.format(
-                    i + 1, len(val_loader),
-                    batch_time=batch_time, data_time=data_time,
-                    loss=losses, top1=top1[-1], top5=top5[-1]))
-                # break
+                      'Acc@1 {top1.val:.4f}\t'
+                      'Acc@5 {top5.val:.4f}'.format(
+                        i + 1, len(val_loader),
+                        batch_time=batch_time, data_time=data_time,
+                        loss=losses, top1=top1[-1], top5=top5[-1]))
     for j in range(args.nBlocks):
-        print(' * Err@1 {top1.avg:.3f} Err@5 {top5.avg:.3f}'.format(top1=top1[j], top5=top5[j]))
-        """
-        print('Exit {}\t'
-              'Err@1 {:.4f}\t'
-              'Err@5 {:.4f}'.format(
-              j, top1[j].avg, top5[j].avg))
-        """
-    # print(' * Err@1 {top1.avg:.3f} Err@5 {top5.avg:.3f}'.format(top1=top1[-1], top5=top5[-1]))
+        print(' * prec@1 {top1.avg:.3f} prec@5 {top5.avg:.3f}'.format(top1=top1[j], top5=top5[j]))
+    # print(' * prec@1 {top1.avg:.3f} prec@5 {top5.avg:.3f}'.format(top1=top1[-1], top5=top5[-1]))
     return losses.avg, top1[-1].avg, top5[-1].avg
+
+def save_checkpoint(state, args, is_best, filename, result):
+    print(args)
+    result_filename = os.path.join(args.save, 'scores.tsv')
+    model_dir = os.path.join(args.save, 'save_models')
+    latest_filename = os.path.join(model_dir, 'latest.txt')
+    model_filename = os.path.join(model_dir, filename)
+    best_filename = os.path.join(model_dir, 'model_best.pth.tar')
+    os.makedirs(args.save, exist_ok=True)
+    os.makedirs(model_dir, exist_ok=True)
+    print("=> saving checkpoint '{}'".format(model_filename))
+
+    torch.save(state, model_filename)
+
+    with open(result_filename, 'w') as f:
+        print('\n'.join(result), file=f)
+
+    with open(latest_filename, 'w') as fout:
+        fout.write(model_filename)
+    if is_best:
+        shutil.copyfile(model_filename, best_filename)
+
+    print("=> saved checkpoint '{}'".format(model_filename))
+    return
+
 
 
 def save_checkpoint(state, args, is_best, filename, result):
