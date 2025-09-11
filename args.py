@@ -41,8 +41,8 @@ data_group = arg_parser.add_argument_group('data', 'dataset setting')
 data_group.add_argument('--data', metavar='D', default='cifar100',
                         choices=['cifar10', 'cifar100', 'ImageNet'],
                         help='data to work on')
-data_group.add_argument('--data-root', metavar='DIR', default='data',
-                        help='path to dataset (default: data)')
+data_group.add_argument('--data-root', metavar='DIR', default='data/cifar',
+                        help='path to dataset (default: data/cifar)')
 data_group.add_argument('--use-valid', action='store_true', default=True,
                         help='use validation set or not')
 data_group.add_argument('-j', '--workers', default=4, type=int, metavar='N',
