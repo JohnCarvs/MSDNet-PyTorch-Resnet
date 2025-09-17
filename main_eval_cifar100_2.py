@@ -76,12 +76,20 @@ def main():
     else:
         IM_SIZE = 224
 
-    model = getattr(models, args.arch)(args)
+    
+    if args.usingsdn:
+        model = SDN(args)
+    else:
+        model = getattr(models, args.arch)(args)
+
     n_flops, n_params = measure_model(model, IM_SIZE, IM_SIZE)
     torch.save(n_flops, os.path.join(args.save, 'flops.pth'))
     del (model)
 
-    model = getattr(models, args.arch)(args)
+    if args.usingsdn:
+        model = SDN(args)
+    else:
+        model = getattr(models, args.arch)(args)
 
     if args.arch.startswith('alexnet') or args.arch.startswith('vgg'):
         model.features = torch.nn.DataParallel(model.features)
@@ -131,11 +139,11 @@ def main():
                                                                                              criterion, bayes_matrix,
                                                                                              threshold=0.98)
     validate_with_bayes_matrix_conformal_prediction(test_loader, model, criterion, bayes_matrix, threshold=0.98)
-
+    '''
     # validate_ensemble(test_loader, model, criterion)
     validate_weight(test_loader, model, criterion)
     validate(test_loader, model, criterion)
-
+    '''
 
     # thresholds = determine_threshold_with_accuracy_per_class(val_loader, model, 0.9)
     # validate_thresholds_on_testset(test_loader, model, thresholds)
@@ -146,7 +154,7 @@ def main():
     #######!!!!!!!!!!
     # bayes_matrix = initialize_bayes_matrix(7, args.num_classes, 0.5)
 
-
+    '''
     bayes_matrix = np.zeros((7, args.num_classes, args.num_classes))
     bayes_matrix = bayes_matrix + 0.5
 
@@ -155,7 +163,7 @@ def main():
 
     bayes_matrix = validate_bayes_matrix(val_loader, model, criterion, bayes_matrix)
     validate_with_bayes_matrix(test_loader, model, criterion, bayes_matrix)
-
+    '''
     bayes_matrix = initialize_bayes_matrix(7, args.num_classes, 0.5)
     print("11")
     best_threshold = 0.8904
