@@ -97,7 +97,33 @@ def main():
         if args.evalmode == 'anytime':
             validate(test_loader, model, criterion)
         else:
-            dynamic_evaluate(model, test_loader, val_loader, args)
+            # Handle ImageNet-C: val_loader is a list of (corruption, severity, DataLoader)
+            if isinstance(val_loader, list):
+                all_results = []
+                failed = []
+                for corruption, severity, loader in val_loader:
+                    print(f"Evaluating {corruption} severity {severity}")
+                    result = dynamic_evaluate(model, loader, loader, args, corruption=corruption, severity=severity)
+                    print(f"Result for {corruption} severity {severity}: {result}")
+                    if result is None:
+                        failed.append((corruption, severity))
+                    all_results.append((corruption, severity, result))
+                # Aggregate only valid results
+                valid_results = [r[2][0] for r in all_results if r[2] is not None]
+                if valid_results:
+                    print("acc by corruption/severity:")
+                    print(valid_results)
+                    mean_acc = sum(valid_results) / len(valid_results)
+                    print(f"mean corruption acc: {mean_acc:.2f}")
+                else:
+                    print("No valid results to aggregate.")
+                # Print failed cases
+                if failed:
+                    print("The following corruptions/severities failed:")
+                    for corruption, severity in failed:
+                        print(f"  - {corruption} severity {severity}")
+            else:
+                dynamic_evaluate(model, test_loader, val_loader, args)
         return
 
     scores = ['epoch\tlr\ttrain_loss\tval_loss\ttrain_prec1'

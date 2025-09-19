@@ -38,23 +38,35 @@ def get_dataloaders(args):
                                         normalize
                                     ]))
     else:
-        # ImageNet
-        traindir = os.path.join(args.data_root, 'train')
-        valdir = os.path.join(args.data_root, 'val')
+        # ImageNet-C: expects --data-root to be data/imagenet
         normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                          std=[0.229, 0.224, 0.225])
-        train_set = datasets.ImageFolder(traindir, transforms.Compose([
-            transforms.RandomResizedCrop(224),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            normalize
-        ]))
-        val_set = datasets.ImageFolder(valdir, transforms.Compose([
-            transforms.Resize(256),
-            transforms.CenterCrop(224),
-            transforms.ToTensor(),
-            normalize
-        ]))
+        val_sets = []
+        val_root = os.path.join(args.data_root, 'val')
+        corruption_types = [d for d in os.listdir(val_root) if os.path.isdir(os.path.join(val_root, d))]
+        #corruption_types = ['defocus_blur']
+        for corruption in corruption_types:
+            for severity in range(1, 6):
+                folder = os.path.join(val_root, corruption, str(severity))
+                if os.path.exists(folder):
+                    val_set = datasets.ImageFolder(folder, transforms.Compose([
+                        transforms.Resize(256),
+                        transforms.CenterCrop(224),
+                        transforms.ToTensor(),
+                        normalize
+                    ]))
+                    val_sets.append((corruption, severity, val_set))
+        train_set = None
+        val_set = val_sets  # val_set is now a list of (corruption, severity, dataset)
+        # Skip use_valid logic for ImageNet-C
+        if args.use_valid:
+            train_loader = None
+            val_loader = [(c, s, torch.utils.data.DataLoader(
+                v,
+                batch_size=args.batch_size, shuffle=False,
+                num_workers=args.workers, pin_memory=True)) for (c, s, v) in val_set]
+            test_loader = val_loader
+            return train_loader, val_loader, test_loader
     if args.use_valid:
         train_set_index = torch.randperm(len(train_set))
         if os.path.exists(os.path.join(args.save, 'index.pth')):

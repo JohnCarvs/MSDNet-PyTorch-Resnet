@@ -8,24 +8,37 @@ import torch.nn as nn
 import os
 import math
 
-def dynamic_evaluate(model, test_loader, val_loader, args):
+from tqdm import tqdm
+
+
+def dynamic_evaluate(model, test_loader, val_loader, args, corruption=None, severity=None):
     tester = Tester(model, args)
-    if os.path.exists(os.path.join(args.save, 'logits_single.pth')): 
-        val_pred, val_target, test_pred, test_target = \
-            torch.load(os.path.join(args.save, 'logits_single.pth')) 
+    # Name of file depends on corruption/severity
+    if corruption is not None and severity is not None:
+        logits_path = os.path.join(args.save, f'logits_single_{corruption}_{severity}.pth')
+        dynamic_txt_path = os.path.join(args.save, f'dynamic_{corruption}_{severity}.txt')
+    else:
+        logits_path = os.path.join(args.save, 'logits_single.pth')
+        dynamic_txt_path = os.path.join(args.save, 'dynamic.txt')
+
+    if os.path.exists(logits_path): 
+        val_pred, val_target, test_pred, test_target = torch.load(logits_path)
     else: 
         val_pred, val_target = tester.calc_logit(val_loader) 
         test_pred, test_target = tester.calc_logit(test_loader) 
-        torch.save((val_pred, val_target, test_pred, test_target), 
-                    os.path.join(args.save, 'logits_single.pth'))
+        torch.save((val_pred, val_target, test_pred, test_target), logits_path)
 
     flops = torch.load(os.path.join(args.save, 'flops.pth'))
 
-    with open(os.path.join(args.save, 'dynamic.txt'), 'w') as fout:
+    last_acc_val = None
+    last_acc_test = None
+    last_exp_flops = None
+
+    with open(dynamic_txt_path, 'w') as fout:
         for p in range(1, 40):
             print("*********************")
             _p = torch.FloatTensor(1).fill_(p * 1.0 / 20)
-            probs = torch.exp(torch.log(_p) * torch.range(1, args.nBlocks))
+            probs = torch.exp(torch.log(_p) * torch.arange(1, args.nBlocks + 1))
             probs /= probs.sum()
             acc_val, _, T = tester.dynamic_eval_find_threshold(
                 val_pred, val_target, probs, flops)
@@ -33,6 +46,11 @@ def dynamic_evaluate(model, test_loader, val_loader, args):
                 test_pred, test_target, flops, T)
             print('valid acc: {:.3f}, test acc: {:.3f}, test flops: {:.2f}M'.format(acc_val, acc_test, exp_flops / 1e6))
             fout.write('{}\t{}\n'.format(acc_test, exp_flops.item()))
+            last_acc_val = acc_val
+            last_acc_test = acc_test
+            last_exp_flops = exp_flops
+
+    return last_acc_val, last_acc_test, last_exp_flops
 
 
 class Tester(object):
@@ -46,7 +64,11 @@ class Tester(object):
         n_stage = self.args.nBlocks
         logits = [[] for _ in range(n_stage)]
         targets = []
-        for i, (input, target) in enumerate(dataloader):
+        for i, batch in enumerate(dataloader):
+            #print(f"Batch type: {type(batch)}, batch len: {len(batch)}")
+            #print(f"Batch content: {batch}")
+            # Unpack for (input, target, *rest) as in ImageNet-C
+            input, target = batch[0], batch[1]
             targets.append(target)
             with torch.no_grad():
                 input_var = torch.autograd.Variable(input)

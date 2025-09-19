@@ -43,8 +43,11 @@ def log_result(function_called, exit_layer_number, corruption, severity, prec1, 
     csv_writer.writerow([function_called, exit_layer_number, corruption, severity, prec1, prec5])
     csv_file.flush()  # write on disk imediatelly
 csv_filename = get_new_csv_filename()
+write_header = not os.path.exists(csv_filename) or os.path.getsize(csv_filename) == 0
 csv_file = open(csv_filename, "w", newline="")
 csv_writer = csv.writer(csv_file)
+if write_header:
+    csv_writer.writerow(["function_called", "exit_layer_number", "corruption", "severity", "prec1", "prec5"])
 
 
 import torch.multiprocessing
@@ -129,203 +132,39 @@ def main():
 
     train_loader, val_loader, test_loader = get_dataloaders(args)
 
-    if args.evalmode is not None:
-        # state_dict = torch.load(args.evaluate_from)['state_dict']
-        # model.load_state_dict(state_dict)
-        # validate(test_loader, model, criterion)
-        # validate(val_loader, model, criterion)
+    test_dict = {(c, s): l for c, s, l in test_loader} if isinstance(test_loader, list) else {}
 
-        # if args.evalmode == 'anytime':
-        # validate(test_loader, model, criterion)
-        # else:
-        
-        #dynamic_evaluate(model, test_loader, val_loader, args)
-        for corruption, severity, loader in val_loader:
-            print(f"Evaluating {corruption} severity {severity}")
-            dynamic_evaluate(model, loader, loader, args, corruption=corruption, severity=severity)
+    for corruption, severity, loader in val_loader:
+        print(f"\n=== Processing {corruption} severity {severity} ===")
+        test_loader_single = test_dict.get((corruption, severity), None)
+        if test_loader_single is None:
+            print(f"Warning: No matching test_loader for {corruption} severity {severity}")
+            continue
 
-        # return
+        # 1. Dynamic evaluate (gera/usa logits)
+        dynamic_evaluate(model, loader, loader, args, corruption=corruption, severity=severity)
 
-    scores = ['epoch\tlr\ttrain_loss\tval_loss\ttrain_prec1'
-              '\tval_prec1\ttrain_prec5\tval_prec5']
+        # 2. Ensemble
+        validate_ensemble(test_loader_single, model, criterion, corruption, severity)
 
-    checkpoint = load_checkpoint(args)
-    model.load_state_dict(checkpoint['state_dict'])
-    '''
-    bayes_matrix = initialize_bayes_matrix(7, args.num_classes, 0.5)
+        # 3. Validação padrão
+        validate(test_loader_single, model, criterion, corruption, severity)
 
-    bayes_matrix = validate_bayes_matrix_with_conformal_prediction_fixing_target_not_most_v2(val_loader, model,
-                                                                                             criterion, bayes_matrix,
-                                                                                             threshold=0.98)
-    validate_with_bayes_matrix_conformal_prediction(test_loader, model, criterion, bayes_matrix, threshold=0.98)
-    '''
+        # 4. Matriz bayesiana simples
+        bayes_matrix = np.zeros((7, args.num_classes, args.num_classes))
+        bayes_matrix = bayes_matrix + 0.5
+        bayes_matrix = validate_bayes_matrix(loader, model, criterion, bayes_matrix)
+        validate_with_bayes_matrix(test_loader_single, model, criterion, bayes_matrix, corruption, severity)
 
-
-    print("validade ensemble -=-=-=-=-=-=-=-=-=-=-=-=-=-")
-
-    if isinstance(test_loader, list):
-        for corruption, severity, loader in test_loader:
-            print(f"Validating ensemble on {corruption} severity {severity}")
-            validate_ensemble(loader, model, criterion, corruption, severity)
-    else:
-        validate_ensemble(test_loader, model, criterion, corruption, severity)
-    #validate_weight(test_loader, model, criterion)
-    
-    print("validade -=-=-=-=-=-=-=-=-=-=-=-=-=-")
-    
-    if isinstance(test_loader, list):
-        for corruption, severity, loader in test_loader:
-            print(f"Validating on {corruption} severity {severity}")
-            validate(loader, model, criterion, corruption, severity)
-    else:
-        validate(test_loader, model, criterion, corruption, severity)
-
-
-    # thresholds = determine_threshold_with_accuracy_per_class(val_loader, model, 0.9)
-    # validate_thresholds_on_testset(test_loader, model, thresholds)
-
-    # best_threshold = 0.8904
-    # print('Best threshold: {:.4f}'.format(best_threshold))
-
-    #######!!!!!!!!!!
-    # bayes_matrix = initialize_bayes_matrix(7, args.num_classes, 0.5)
-
-
-    bayes_matrix = np.zeros((7, args.num_classes, args.num_classes))
-    bayes_matrix = bayes_matrix + 0.5
-
-    # bayes_matrix = validate_bayes_matrix_enselble(test_loader, model, criterion, bayes_matrix)
-    # validate_with_bayes_matrix_enselble(test_loader, model, criterion, bayes_matrix)
-
-    print("validade bayes matrix -=-=-=-=-=-=-=-=-=-=-=-=-=-")
-    
-    if isinstance(val_loader, list):
-        # Junte todos os batches de todos os loaders em um único iterador
-        from itertools import chain
-        all_val_loaders = [loader for _, _, loader in val_loader]
-        combined_val_loader = chain.from_iterable(all_val_loaders)
-        bayes_matrix = validate_bayes_matrix(combined_val_loader, model, criterion, bayes_matrix)
-    else:
-        bayes_matrix = validate_bayes_matrix(val_loader, model, criterion, bayes_matrix)    
-    
-    # iterate test_loader
-    if isinstance(test_loader, list):
-        for corruption, severity, loader in test_loader:
-            print(f"Validando com bayes_matrix em {corruption} severidade {severity}")
-            validate_with_bayes_matrix(loader, model, criterion, bayes_matrix, corruption, severity)
-    else:
-        validate_with_bayes_matrix(test_loader, model, criterion, bayes_matrix, None, None)
-    
-    bayes_matrix = initialize_bayes_matrix(7, args.num_classes, 0.5)
-    print("11")
-    best_threshold = 0.8904
-
-
-    print("validade bayes matrix with conformal prediction -=-=-=-=-=-=-=-=-=-=-=-=-=-")
-
-    if isinstance(val_loader, list):
-        for corruption, severity, loader in val_loader:
-            print(f"Validando bayes_matrix em {corruption} severidade {severity}")
-            bayes_matrix = validate_bayes_matrix_with_conformal_prediction_fixing_target_not_most_v2(
-                loader, model, criterion, bayes_matrix, threshold=0.95
-            )
-    else:
+        # 5. Matriz bayesiana com conformal prediction (v2)
+        bayes_matrix = initialize_bayes_matrix(7, args.num_classes, 0.5)
+        best_threshold = 0.8904  # ou calcule dinamicamente se quiser
         bayes_matrix = validate_bayes_matrix_with_conformal_prediction_fixing_target_not_most_v2(
-            val_loader, model, criterion, bayes_matrix, threshold=0.95
+            loader, model, criterion, bayes_matrix, threshold=0.95
         )
-    
-    if isinstance(test_loader, list):
-        for corruption, severity, loader in test_loader:
-            print(f"Validando com bayes_matrix em {corruption} severidade {severity}")
-            validate_with_bayes_matrix_conformal_prediction(
-                loader, model, criterion, bayes_matrix, threshold=0.95, corruption=corruption, severity=severity
-            )
-    else:
         validate_with_bayes_matrix_conformal_prediction(
-            test_loader, model, criterion, bayes_matrix, threshold=0.95, corruption=corruption, severity=severity
+            test_loader_single, model, criterion, bayes_matrix, threshold=0.95, corruption=corruption, severity=severity
         )
-    # bayes_matrix = np.zeros((7, args.num_classes, args.num_classes))
-    # bayes_matrix = validate_bayes_matrix(val_loader, model, criterion, bayes_matrix)
-    '''
-    for i in range(7):
-        bayes_matrix[i] = bayes_matrix[i] / np.max(bayes_matrix[i])
-        bayes_matrix[i] = 1 - bayes_matrix[i]
-
-    # print('Bayes matrix: ', bayes_matrix[0][0])
-
-    # bayes_matrix[0] = (bayes_matrix[0] + bayes_matrix[0].T) / 2
-    # np.fill_diagonal(bayes_matrix[0], 0)
-    #
-    # condensed_distance_matrix = squareform(bayes_matrix[0])
-    # Z = linkage(condensed_distance_matrix, method='average')
-    # plt.figure(figsize=(10, 7))
-    # dendrogram(Z, labels=range(len(bayes_matrix[0])))
-    # plt.show()
-
-    # 根据距离阈值t进行剪枝，得到聚类结果
-    # clusters = fcluster(Z, t=0.998, criterion='distance')
-
-    # 输出聚类结果，每个类别对应一个聚类
-    # for i, cluster_id in enumerate(clusters):
-    #     print(f'Class {i} is in cluster {cluster_id}')
-
-    bayes_matrix = initialize_bayes_matrix(7, args.num_classes, 0.5)
-    print("11")
-    best_threshold = 0.8904
-    # thresholds = determine_threshold_with_accuracy_per_class(val_loader, model, 0.9)
-
-    # cluster_mapping = {class_id: cluster_id for class_id, cluster_id in enumerate(clusters)}
-    # # print(cluster_mapping)
-    #
-    # # print('Bayes matrix: ', bayes_matrix[6])
-    # bayes_matrix = validate_bayes_matrix_with_conformal_prediction_fixing_target_not_most_v2_for_len1(val_loader, model, None, bayes_matrix, best_threshold)
-    # bayes_matrix = validate_bayes_matrix_with_conformal_prediction_fixing_target_not_most_v2_for_len2_cluster(val_loader, model,
-    #                                                                                                   None,
-    #                                                                                                   bayes_matrix,
-    #                                                                                                   best_threshold, cluster_mapping)
-    # # print('Bayes matrix: ', bayes_matrix[6])
-    #
-    # validate_with_bayes_matrix_conformal_prediction_cluster(test_loader, model, criterion, bayes_matrix, best_threshold, cluster_mapping)
-    ######!!!!!!!!!!
-
-    # print('Bayes matrix: ', bayes_matrix[0])
-
-    print("validade bayes matrix fixing previous distribution -=-=-=-=-=-=-=-=-=-=-=-=-=-")
-
-    # bayes_matrix = validate_bayes_matrix(val_loader, model, criterion, bayes_matrix)
-    # Para train_loader
-    if isinstance(train_loader, list):
-        for corruption, severity, loader in train_loader:
-            print(f"Validando bayes_matrix no treino em {corruption} severidade {severity}")
-            bayes_matrix = validate_bayes_matrix(loader, model, criterion, bayes_matrix)
-    else:
-        bayes_matrix = validate_bayes_matrix(train_loader, model, criterion, bayes_matrix)
-
-    # Para test_loader
-    if isinstance(test_loader, list):
-        for corruption, severity, loader in test_loader:
-            print(f"Validando com bayes_matrix (fixing previous distribution) em {corruption} severidade {severity}")
-            validate_with_bayes_matrix_fixing_previous_distribution(loader, model, criterion, bayes_matrix)
-    else:
-        validate_with_bayes_matrix_fixing_previous_distribution(test_loader, model, criterion, bayes_matrix)
-
-    # validate_with_bayes_matrix(val_loader, model, criterion, bayes_matrix)
-    # validate(test_loader, model, criterion)
-    # validate(test_loader, model, criterion)
-
-    # validate(test_loader, model, criterion)
-    # validate(val_loader, model, criterion)
-
-
-    # validate_overconfident(test_loader, model, criterion)
-    # dynamic_evaluate(model, test_loader, val_loader, args)
-
-
-
-    # print('Best val_prec1: {:.4f} at epoch {}'.format(best_prec1, best_epoch))
-
-    ### Test the final model
-    '''
     print('********** Final prediction results **********')
     # validate(test_loader, model, criterion)
 

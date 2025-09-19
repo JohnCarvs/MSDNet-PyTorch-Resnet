@@ -111,3 +111,9 @@ cifar-100-python/*
 cifar-100-python.*
 
 .DS_Store
+
+.jpeg
+.JPEG
+.jpg
+.png
+/data
