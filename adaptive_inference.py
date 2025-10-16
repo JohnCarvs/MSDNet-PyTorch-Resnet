@@ -8,9 +8,6 @@ import torch.nn as nn
 import os
 import math
 
-from tqdm import tqdm
-
-
 def dynamic_evaluate(model, test_loader, val_loader, args, corruption=None, severity=None):
     tester = Tester(model, args)
     # Name of file depends on corruption/severity
