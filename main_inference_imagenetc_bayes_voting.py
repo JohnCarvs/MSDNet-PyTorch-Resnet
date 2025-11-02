@@ -168,9 +168,9 @@ def main():
     del val_iter, first_batch  # Free memory
 
     # Dynamic evaluate
-    if args.evalmode is not None:
-        for corruption, severity, test_loader_single in tqdm(test_loader_list, desc="Dynamic evaluation"):
-            dynamic_evaluate(model, test_loader_single, val_loader, args, corruption=corruption, severity=severity)
+    #if args.evalmode is not None:
+    #    for corruption, severity, test_loader_single in tqdm(test_loader_list, desc="Dynamic evaluation"):
+    #        dynamic_evaluate(model, test_loader_single, val_loader, args, corruption=corruption, severity=severity)
 
     # For each corruption/severity, execute the same sequence as original bayes voting code
     for corruption, severity, test_loader_single in tqdm(test_loader_list, desc="Processing corruptions"):
@@ -183,6 +183,7 @@ def main():
         validate_with_bayes_matrix_conformal_prediction(test_loader_single, model, criterion, bayes_matrix, threshold=0.98, corruption=corruption, severity=severity)
 
         # block 2:
+        validate_ensemble(test_loader_single, model, criterion, corruption, severity)
         #validate_weight(test_loader_single, model, criterion)
         validate(test_loader_single, model, criterion, corruption, severity)
 
