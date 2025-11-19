@@ -35,10 +35,17 @@ import glob
 
 # csv file writter
 def get_new_csv_filename():
-    existing = glob.glob("output_*.csv")
+    output_dir = os.path.dirname(os.path.abspath(__file__))
+    
+    # creat repo, if it does not exist
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    
+    existing = glob.glob(os.path.join(output_dir, "output_*.csv"))
     nums = [int(f.split("_")[-1].split(".")[0]) for f in existing if f.split("_")[-1].split(".")[0].isdigit()]
     n = max(nums) + 1 if nums else 1
-    return f"output_{n}.csv"
+    return os.path.join(output_dir, f"output_{n}.csv")
+
 def log_result(function_called, exit_layer_number, corruption, severity, prec1, prec5):
     global csv_writer
     csv_writer.writerow([function_called, exit_layer_number, corruption, severity, prec1, prec5])
@@ -130,56 +137,65 @@ def main():
     cudnn.benchmark = True
 
     # load datasets
-    val_loader = get_val_dataloader(args)  # ImageNet clean
-    test_loader_list = get_test_dataloader(args)  # list of tuples (corruption, severity, loader) from ImageNet-C
+    val_loader_list = get_val_dataloader(args)  # list of tuples (corruption, severity, loader) from ImageNet-C val_split
+    test_loader_list = get_test_dataloader(args)  # list of tuples (corruption, severity, loader) from ImageNet-C test_split
 
     # Print dataloader info
     print("\n========== DataLoader Information ==========")
-    print(f"Val Loader:")
-    print(f"  - Dataset: {type(val_loader.dataset).__name__}")
-    print(f"  - Num samples: {len(val_loader.dataset)}")
-    print(f"  - Batch size: {val_loader.batch_size}")
-    print(f"  - Num batches: {len(val_loader)}")
-    print(f"  - Num workers: {val_loader.num_workers}")
+    print(f"Val Loader List (val_split):")
+    print(f"  - Total corruption/severity combinations: {len(val_loader_list)}")
+    if len(val_loader_list) > 0:
+        first_corruption, first_severity, first_loader = val_loader_list[0]
+        print(f"  - Dataset per loader: {type(first_loader.dataset).__name__}")
+        print(f"  - Num samples per loader: {len(first_loader.dataset)}")
+        print(f"  - Batch size: {first_loader.batch_size}")
+        print(f"  - Num workers: {first_loader.num_workers}")
     
-    print(f"\nTest Loader List:")
-    print(f"  - Total corruption/severity combinations: {len(test_loader_list)}")
     print(f"  - Corruptions found:")
-    corruptions_dict = {}
-    for corruption, severity, loader in test_loader_list:
-        if corruption not in corruptions_dict:
-            corruptions_dict[corruption] = []
-        corruptions_dict[corruption].append(severity)
-    for corruption, severities in sorted(corruptions_dict.items()):
+    val_corruptions_dict = {}
+    for corruption, severity, loader in val_loader_list:
+        if corruption not in val_corruptions_dict:
+            val_corruptions_dict[corruption] = []
+        val_corruptions_dict[corruption].append(severity)
+    for corruption, severities in sorted(val_corruptions_dict.items()):
         print(f"    - {corruption}: severities {sorted(severities)}")
     
-    # Show first batch info
-    print(f"\nFirst batch from val_loader:")
-    val_iter = iter(val_loader)
-    first_batch = next(val_iter)
-    if isinstance(first_batch, (tuple, list)):
-        print(f"  - Batch contains {len(first_batch)} elements")
-        print(f"  - Input shape: {first_batch[0].shape}")
-        print(f"  - Target shape: {first_batch[1].shape}")
-        print(f"  - Input dtype: {first_batch[0].dtype}")
-        print(f"  - Target dtype: {first_batch[1].dtype}")
-        print(f"  - First 5 targets: {first_batch[1][:5]}")
-    print("=" * 44 + "\n")
-    del val_iter, first_batch  # Free memory
+    print(f"\nTest Loader List (test_split):")
+    print(f"  - Total corruption/severity combinations: {len(test_loader_list)}")
+    print(f"  - Corruptions found:")
+    test_corruptions_dict = {}
+    for corruption, severity, loader in test_loader_list:
+        if corruption not in test_corruptions_dict:
+            test_corruptions_dict[corruption] = []
+        test_corruptions_dict[corruption].append(severity)
+    for corruption, severities in sorted(test_corruptions_dict.items()):
+        print(f"    - {corruption}: severities {sorted(severities)}")
+    
 
+    # Create a dict for quick lookup: (corruption, severity) - val_loader
+    val_dict = {(corr, sev): loader for corr, sev, loader in val_loader_list}
+    
     # Dynamic evaluate
     #if args.evalmode is not None:
     #    for corruption, severity, test_loader_single in tqdm(test_loader_list, desc="Dynamic evaluation"):
-    #        dynamic_evaluate(model, test_loader_single, val_loader, args, corruption=corruption, severity=severity)
+    #        val_loader_single = val_dict.get((corruption, severity))
+    #        if val_loader_single:
+    #            dynamic_evaluate(model, test_loader_single, val_loader_single, args, corruption=corruption, severity=severity)
 
     # For each corruption/severity, execute the same sequence as original bayes voting code
     for corruption, severity, test_loader_single in tqdm(test_loader_list, desc="Processing corruptions"):
         print(f"\nProcessing {corruption} severity {severity}")
         
+        # Get corresponding val_loader for this corruption/severity
+        val_loader_single = val_dict.get((corruption, severity))
+        if val_loader_single is None:
+            print(f"No val loader found for {corruption} severity {severity}. skipping")
+            continue
+        
         # block 1:
         bayes_matrix = initialize_bayes_matrix(args.nBlocks, args.num_classes, 0.5)
         bayes_matrix = validate_bayes_matrix_with_conformal_prediction_fixing_target_not_most_v2(
-            val_loader, model, criterion, bayes_matrix, threshold=0.98)
+            val_loader_single, model, criterion, bayes_matrix, threshold=0.98)
         validate_with_bayes_matrix_conformal_prediction(test_loader_single, model, criterion, bayes_matrix, threshold=0.98, corruption=corruption, severity=severity)
 
         # block 2:
@@ -190,14 +206,14 @@ def main():
         # block 3:
         bayes_matrix = np.zeros((args.nBlocks, args.num_classes, args.num_classes))
         bayes_matrix = bayes_matrix + 0.5
-        bayes_matrix = validate_bayes_matrix(val_loader, model, criterion, bayes_matrix)
+        bayes_matrix = validate_bayes_matrix(val_loader_single, model, criterion, bayes_matrix)
         validate_with_bayes_matrix(test_loader_single, model, criterion, bayes_matrix, corruption, severity)
 
         # block 4:
         bayes_matrix = initialize_bayes_matrix(args.nBlocks, args.num_classes, 0.5)
         print("11")
         bayes_matrix = validate_bayes_matrix_with_conformal_prediction_fixing_target_not_most_v2(
-            val_loader, model, criterion, bayes_matrix, threshold=0.95)
+            val_loader_single, model, criterion, bayes_matrix, threshold=0.95)
         validate_with_bayes_matrix_conformal_prediction(test_loader_single, model, criterion, bayes_matrix, threshold=0.95, corruption=corruption, severity=severity)
 
         # ...
