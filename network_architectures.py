@@ -66,6 +66,8 @@ def create_vgg16bn(task, save_type, get_params=False):
         model_params['fc_layers'] = [512, 512]
     elif model_params['input_size'] == 64:
         model_params['fc_layers'] = [2048, 1024]
+    elif model_params['input_size'] == 224:
+        model_params['fc_layers'] = [4096, 4096]
 
     model_params['conv_channels']  = [64, 64, 128, 128, 256, 256, 256, 512, 512, 512, 512, 512, 512]
     model_name = '{}_vgg16bn'.format(task)
@@ -156,6 +158,8 @@ def get_task_params(task):
         return cifar100_params()
     elif task == 'tinyimagenet':
         return tiny_imagenet_params()
+    elif task == 'places365':
+        return places365_params()
 
 def cifar10_params():
     model_params = {}
@@ -176,6 +180,13 @@ def tiny_imagenet_params():
     model_params['task'] = 'tinyimagenet'
     model_params['input_size'] = 64
     model_params['num_classes'] = 200
+    return model_params
+
+def places365_params():
+    model_params = {}
+    model_params['task'] = 'places365'
+    model_params['input_size'] = 224
+    model_params['num_classes'] = 365
     return model_params
 
 def get_lr_params(model_params):

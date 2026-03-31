@@ -11,7 +11,7 @@ arg_parser = argparse.ArgumentParser(
 # model sdn arch related
 sdn_exp=arg_parser.add_argument_group('SDN','ConstructingSDN')
 sdn_exp.add_argument('--sdnarch',default='resnet56',type=str,choices=['vgg16','resnet56','wideresnet32_4','mobilenet'])
-sdn_exp.add_argument('--task',default='cifar100',type=str,choices=['cifar10','cifar100','tinyimagenet'])
+sdn_exp.add_argument('--task',default='cifar100',type=str,choices=['cifar10','cifar100','tinyimagenet','places365'])
 sdn_exp.add_argument('--ge',default=0,type=int)
 sdn_exp.add_argument('--usingsdn',default=1,type=int)
 sdn_exp.add_argument('--predefinedindex',default='index.pth',type=str)
@@ -39,7 +39,7 @@ exp_group.add_argument('--gpu', default=None, type=str, help='GPU available.')
 # dataset related
 data_group = arg_parser.add_argument_group('data', 'dataset setting')
 data_group.add_argument('--data', metavar='D', default='cifar100',
-                        choices=['cifar10', 'cifar100', 'ImageNet'],
+                        choices=['cifar10', 'cifar100', 'ImageNet', 'places365'],
                         help='data to work on')
 data_group.add_argument('--data-root', metavar='DIR', default='data/cifar',
                         help='path to dataset (default: data/cifar)')

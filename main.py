@@ -36,8 +36,14 @@ if args.data == 'cifar10':
     args.num_classes = 10
 elif args.data == 'cifar100':
     args.num_classes = 100
+elif args.data == 'places365':
+    args.num_classes = 365
 else:
     args.num_classes = 1000
+
+if args.usingsdn and args.data == 'places365' and args.task != 'places365':
+    print("[INFO] Overriding --task to places365 for SDN construction")
+    args.task = 'places365'
 
 import torch
 import torch.nn as nn
