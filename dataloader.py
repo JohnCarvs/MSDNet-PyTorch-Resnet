@@ -3,6 +3,30 @@ import torchvision.datasets as dset
 import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 import os
+ 
+
+def _load_places365_indices_strict(targets, args):
+    """Load existing Places365 split indices from file without creating new splits."""
+    indices_file = os.path.join(args.data_root, 'places365_val_indices.pth')
+
+    if not os.path.exists(indices_file):
+        raise FileNotFoundError(
+            f"places365 split file not found: {indices_file}. "
+            "Create it beforehand and rerun."
+        )
+
+    saved = torch.load(indices_file)
+    val_indices = saved.get('val_indices')
+    if val_indices is None:
+        raise ValueError(f"Invalid split file (missing val_indices): {indices_file}")
+
+    print(f"Loaded validation indices from {indices_file}")
+    print(f"Split metadata: val_per_class={saved.get('val_per_class')} seed={saved.get('seed')}")
+
+    all_indices = set(range(len(targets)))
+    val_set = set(val_indices)
+    train_indices = sorted(list(all_indices - val_set))
+    return train_indices, val_indices
 
 
 def get_dataloaders(args):
@@ -37,6 +61,67 @@ def get_dataloaders(args):
                                         transforms.ToTensor(),
                                         normalize
                                     ]))
+    elif args.data == 'places365':
+        train_dir = os.path.join(args.data_root, 'train')
+        test_dir = os.path.join(args.data_root, 'val')
+
+        normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                         std=[0.229, 0.224, 0.225])
+
+        train_set = datasets.ImageFolder(train_dir, transforms.Compose([
+            transforms.RandomResizedCrop(224),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            normalize,
+        ]))
+
+        eval_set = datasets.ImageFolder(train_dir, transforms.Compose([
+            transforms.Resize(256),
+            transforms.CenterCrop(224),
+            transforms.ToTensor(),
+            normalize,
+        ]))
+
+        test_set = datasets.ImageFolder(test_dir, transforms.Compose([
+            transforms.Resize(256),
+            transforms.CenterCrop(224),
+            transforms.ToTensor(),
+            normalize,
+        ]))
+
+        train_indices, val_indices = _load_places365_indices_strict(train_set.targets, args)
+        print(f"Places365 split: train={len(train_indices)} val={len(val_indices)} "
+              f"(val_per_class={len(val_indices) // 365})")
+
+        if 'train' in args.splits:
+            train_loader = torch.utils.data.DataLoader(
+                train_set,
+                batch_size=args.batch_size,
+                sampler=torch.utils.data.sampler.SubsetRandomSampler(train_indices),
+                num_workers=args.workers,
+                pin_memory=True,
+            )
+        if 'val' in args.splits:
+            val_loader = torch.utils.data.DataLoader(
+                eval_set,
+                batch_size=args.batch_size,
+                sampler=torch.utils.data.sampler.SubsetRandomSampler(val_indices),
+                num_workers=args.workers,
+                pin_memory=True,
+            )
+        if 'test' in args.splits:
+            test_loader = torch.utils.data.DataLoader(
+                test_set,
+                batch_size=args.batch_size,
+                shuffle=False,
+                num_workers=args.workers,
+                pin_memory=True,
+            )
+
+        if test_loader is None:
+            test_loader = val_loader
+
+        return train_loader, val_loader, test_loader
     else:
         # ImageNet
         traindir = os.path.join(args.data_root, 'train')
