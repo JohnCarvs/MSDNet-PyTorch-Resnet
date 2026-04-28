@@ -29,6 +29,8 @@ from scipy.cluster.hierarchy import linkage, fcluster, dendrogram
 import matplotlib.pyplot as plt
 from scipy.spatial.distance import squareform
 
+from models.SDN_Constructing import SDN
+
 
 
 import torch.multiprocessing
@@ -76,7 +78,7 @@ def main():
     else:
         IM_SIZE = 224
 
-    
+    # create model
     if args.usingsdn:
         model = SDN(args)
     else:
@@ -132,7 +134,7 @@ def main():
 
     checkpoint = load_checkpoint(args)
     model.load_state_dict(checkpoint['state_dict'])
-
+    '''
     bayes_matrix = initialize_bayes_matrix(7, args.num_classes, 0.5)
 
     bayes_matrix = validate_bayes_matrix_with_conformal_prediction_fixing_target_not_most_v2(val_loader, model,
@@ -140,10 +142,12 @@ def main():
                                                                                              threshold=0.98)
     validate_with_bayes_matrix_conformal_prediction(test_loader, model, criterion, bayes_matrix, threshold=0.98)
     '''
-    # validate_ensemble(test_loader, model, criterion)
-    validate_weight(test_loader, model, criterion)
+    
+    print("validade ensemble -=-=-=-=-=-=-=-=-=-=-=-=-=-")
+    validate_ensemble(test_loader, model, criterion)
+    #validate_weight(test_loader, model, criterion)
+    print("validade -=-=-=-=-=-=-=-=-=-=-=-=-=-")
     validate(test_loader, model, criterion)
-    '''
 
     # thresholds = determine_threshold_with_accuracy_per_class(val_loader, model, 0.9)
     # validate_thresholds_on_testset(test_loader, model, thresholds)
@@ -154,21 +158,24 @@ def main():
     #######!!!!!!!!!!
     # bayes_matrix = initialize_bayes_matrix(7, args.num_classes, 0.5)
 
-    '''
+    #'''
     bayes_matrix = np.zeros((7, args.num_classes, args.num_classes))
     bayes_matrix = bayes_matrix + 0.5
 
     # bayes_matrix = validate_bayes_matrix_enselble(test_loader, model, criterion, bayes_matrix)
     # validate_with_bayes_matrix_enselble(test_loader, model, criterion, bayes_matrix)
 
+    print("validade bayes matrix -=-=-=-=-=-=-=-=-=-=-=-=-=-")
     bayes_matrix = validate_bayes_matrix(val_loader, model, criterion, bayes_matrix)
     validate_with_bayes_matrix(test_loader, model, criterion, bayes_matrix)
-    '''
+    #'''
     bayes_matrix = initialize_bayes_matrix(7, args.num_classes, 0.5)
     print("11")
-    best_threshold = 0.8904
+    #best_threshold = 0.8904
+    best_threshold = 0.60
 
 
+    print("validade bayes matrix with conformal prediction -=-=-=-=-=-=-=-=-=-=-=-=-=-")
     bayes_matrix = validate_bayes_matrix_with_conformal_prediction_fixing_target_not_most_v2(val_loader, model, criterion, bayes_matrix, threshold = 0.95)
     validate_with_bayes_matrix_conformal_prediction(test_loader, model, criterion, bayes_matrix, threshold = 0.95)
     # bayes_matrix = np.zeros((7, args.num_classes, args.num_classes))
@@ -198,7 +205,8 @@ def main():
 
     bayes_matrix = initialize_bayes_matrix(7, args.num_classes, 0.5)
     print("11")
-    best_threshold = 0.8904
+    #best_threshold = 0.8904
+    best_threshold = 0.60
     # thresholds = determine_threshold_with_accuracy_per_class(val_loader, model, 0.9)
 
     # cluster_mapping = {class_id: cluster_id for class_id, cluster_id in enumerate(clusters)}
@@ -219,6 +227,7 @@ def main():
 
 
     # bayes_matrix = validate_bayes_matrix(val_loader, model, criterion, bayes_matrix)
+    print("validade bayes matrix fixing previous distribution -=-=-=-=-=-=-=-=-=-=-=-=-=-")
     bayes_matrix = validate_bayes_matrix(train_loader, model, criterion, bayes_matrix)
 
 
@@ -615,7 +624,7 @@ def validate(val_loader, model, criterion):
 
             data_time.update(time.time() - end)
 
-            output = model(input_var)
+            output, _ = model(input_var)
             if not isinstance(output, list):
                 output = [output]
 
@@ -648,6 +657,7 @@ def validate(val_loader, model, criterion):
                     batch_time=batch_time, data_time=data_time,
                     loss=losses, top1=top1[-1], top5=top5[-1]))
     for j in range(args.nBlocks):
+        print("PRINT 2")
         print(' * prec@1 {top1.avg:.3f} prec@5 {top5.avg:.3f}'.format(top1=top1[j], top5=top5[j]))
     # print(' * prec@1 {top1.avg:.3f} prec@5 {top5.avg:.3f}'.format(top1=top1[-1], top5=top5[-1]))
     return losses.avg, top1[-1].avg, top5[-1].avg
@@ -686,7 +696,7 @@ def validate_weight(val_loader, model, criterion, weights=None):
 
             data_time.update(time.time() - end)
 
-            output = model(input_var)
+            output, _ = model(input_var)
             if not isinstance(output, list):
                 output = [output]
 
@@ -752,7 +762,7 @@ def validate_ensemble(val_loader, model, criterion):
 
             data_time.update(time.time() - end)
 
-            output = model(input_var)
+            output, _ = model(input_var)
             if not isinstance(output, list):
                 output = [output]
 
@@ -796,6 +806,7 @@ def validate_ensemble(val_loader, model, criterion):
 
     # 输出每个classifier的最终平均准确率
     for j in range(args.nBlocks):
+        print("PRINT1")
         print(' * Classifier {0} -> prec@1 {top1.avg:.3f} prec@5 {top5.avg:.3f}'.format(j, top1=top1[j], top5=top5[j]))
 
     return losses.avg, top1[-1].avg, top5[-1].avg
@@ -907,7 +918,7 @@ def validate_bayes_matrix_with_conformal_prediction_fixing_target_not_most_v2(va
             input_var = torch.autograd.Variable(input)
             target_var = torch.autograd.Variable(target)
 
-            output = model(input_var)
+            output, _ = model(input_var)
             if not isinstance(output, list):
                 output = [output]
 
@@ -1016,7 +1027,7 @@ def validate_bayes_matrix(val_loader, model, criterion, bayes_matrix):
             input_var = torch.autograd.Variable(input)
             target_var = torch.autograd.Variable(target)
 
-            output = model(input_var)
+            output, _ = model(input_var)
             if not isinstance(output, list):
                 output = [output]
 
@@ -1050,7 +1061,7 @@ def validate_with_bayes_matrix(val_loader, model, criterion, bayes_matrix):
 
             data_time.update(time.time() - end)
 
-            output = model(input_var)
+            output, _ = model(input_var)
             if not isinstance(output, list):
                 output = [output]
 
@@ -1115,6 +1126,7 @@ def validate_with_bayes_matrix(val_loader, model, criterion, bayes_matrix):
 
 
     for j in range(args.nBlocks):
+        print("PRINT3")
         print(' * prec@1 {top1.avg:.3f} '.format(top1=top1[j]))
     # print(' * prec@1 {top1.avg:.3f} prec@5 {top5.avg:.3f}'.format(top1=top1[-1], top5=top5[-1]))
     return
@@ -1519,7 +1531,7 @@ def validate_with_bayes_matrix_conformal_prediction(val_loader, model, criterion
 
             data_time.update(time.time() - end)
 
-            output = model(input_var)
+            output, _ = model(input_var)
             if not isinstance(output, list):
                 output = [output]
 
@@ -1612,6 +1624,7 @@ def validate_with_bayes_matrix_conformal_prediction(val_loader, model, criterion
 
 
     for j in range(args.nBlocks):
+        print("PRINT4")
         print(' * Block {j} prec@1 {top1.avg:.3f} prec@5 {top5.avg:.3f}'.format(j=j, top1=top1[j], top5=top5[j]))
     return
 

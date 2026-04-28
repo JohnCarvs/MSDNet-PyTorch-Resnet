@@ -50,7 +50,7 @@ class Tester(object):
             targets.append(target)
             with torch.no_grad():
                 input_var = torch.autograd.Variable(input)
-                output = self.model(input_var)
+                output, _ = self.model(input_var)
                 if not isinstance(output, list):
                     output = [output]
                 for b in range(n_stage):
