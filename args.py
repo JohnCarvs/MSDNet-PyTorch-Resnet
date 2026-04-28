@@ -45,6 +45,8 @@ data_group.add_argument('--data-root', metavar='DIR', default='data/cifar',
                         help='path to dataset (default: data/cifar)')
 data_group.add_argument('--use-valid', action='store_true', default=True,
                         help='use validation set or not')
+data_group.add_argument('--places365-val-per-class', default=2000, type=int,
+                        help='number of train/ images per class reserved for validation in Places365')
 data_group.add_argument('-j', '--workers', default=4, type=int, metavar='N',
                         help='number of data loading workers (default: 4)')
 
