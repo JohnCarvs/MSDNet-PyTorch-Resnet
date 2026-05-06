@@ -746,19 +746,28 @@ def validate_ensemble(val_loader, model, criterion, corruption, severity):
             # ensemble_output = (output[0] + output[1]) / 2
 
             loss = 0.0
+            ensemble_count = 0  # Track how many classifiers we've accumulated
             for j in range(len(output)):
-                # 累加前面所有classifier的输出
-                cumulative_output += output[j]
-                # 计算平均ensemble输出
-                ensemble_output = cumulative_output / (j + 1)
+                # Skip j=0,1 to avoid noise; start ensemble from j=2
+                if j >= 2:
+                    # 累加前面所有classifier的输出
+                    cumulative_output += output[j]
+                    ensemble_count += 1
+                    # 计算平均ensemble输出
+                    ensemble_output = cumulative_output / ensemble_count
 
-                # 计算ensemble的损失
-                loss += criterion(ensemble_output, target)
+                    # 计算ensemble的损失
+                    loss += criterion(ensemble_output, target)
 
-                # 使用ensemble结果计算当前classifier的精度
-                prec1, prec5 = accuracy(ensemble_output.data, target, topk=(1, 5))
-                top1[j].update(prec1.item(), input.size(0))
-                top5[j].update(prec5.item(), input.size(0))
+                    # 使用ensemble结果计算当前classifier的精度
+                    prec1, prec5 = accuracy(ensemble_output.data, target, topk=(1, 5))
+                    top1[j].update(prec1.item(), input.size(0))
+                    top5[j].update(prec5.item(), input.size(0))
+                else:
+                    # For j=0,1: just use the individual classifier output
+                    prec1, prec5 = accuracy(output[j].data, target, topk=(1, 5))
+                    top1[j].update(prec1.item(), input.size(0))
+                    top5[j].update(prec5.item(), input.size(0))
 
             losses.update(loss.item(), input.size(0))
 
@@ -1656,8 +1665,11 @@ def validate_with_bayes_matrix_conformal_prediction(val_loader, model, criterion
 
                     # output_bayes = torch.tensor(output_bayes).cuda()
 
-                    # Multiply with previous result
-                    output_bayes = output_bayes * output_bayes_temp #!!!!
+                    # Multiply with previous result (skip for j=0,1 to avoid noise)
+                    if j >= 2:
+                        output_bayes = output_bayes * output_bayes_temp #!!!!
+                    else:
+                        output_bayes = output_bayes_temp
                     # print("output_bayes_after: ", output_bayes)
                 
                 # Calculate accuracy before normalization
