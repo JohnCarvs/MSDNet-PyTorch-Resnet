@@ -88,16 +88,53 @@ def create_vgg16bn(task, save_type, get_params=False):
     return constructing(model_name, model_params, save_type)
 
 
-def create_resnet56(task, save_type, get_params=False):
+def create_resnet56(task, save_type, get_params=False, add_ic_config=0, final_head='linear'):
     print('Creating resnet56 untrained {} models...'.format(task))
     model_params = get_task_params(task)
     model_params['block_type'] = 'basic'
     model_params['num_blocks'] = [9,9,9]
-    model_params['add_ic'] = [[0, 0, 0, 1, 0, 0, 0, 1, 0], [0, 0, 1, 0, 0, 0, 1, 0, 0], [0, 1, 0, 0, 0, 1, 0, 0, 0]] # 15, 30, 45, 60, 75, 90 percent of GFLOPs
+    
+    print("Configurações de 'add internal classfier' =======================")
+    
+    if (add_ic_config == 0):
+        model_params['add_ic'] = [[0, 0, 0, 1, 0, 0, 0, 1, 0], [0, 0, 1, 0, 0, 0, 1, 0, 0], [0, 1, 0, 0, 0, 1, 0, 0, 0]] # 15, 30, 45, 60, 75, 90 percent of GFLOPs
+        print("config padrão")
+
+    
+    elif (add_ic_config == 1):
+        model_params['add_ic'] = [[0, 0, 0, 1, 0, 0, 0, 1, 0], [0, 0, 1, 0, 0, 0, 1, 0, 0], [0, 1, 0, 0, 0, 1, 1, 1, 1]] # 15, 30, 45, 60, 75, 90 percent of GFLOPs - mais saídas no final para avaliar tendencia vista no resultado principal. testar com 10 saídas - comparar com as configs abaixo com 10 saídas
+        print("mais saídas no final para avaliar tendencia vista no resultado principal. testar com 10 saídas - comparar com as configs abaixo com 10 saídas")
+    elif (add_ic_config == 2):
+        model_params['add_ic'] = [[0, 0, 0, 1, 0, 0, 0, 1, 0], [0, 0, 1, 0, 0, 0, 1, 0, 0], [0, 1, 0, 0, 0, 1, 0, 0, 1]] # 15, 30, 45, 60, 75, 90 percent of GFLOPs - caso com uma saída a mais no final, pra avaliar se tendência continua
+        print("caso com uma saída a mais no final, pra avaliar se tendência continua")
+    
+    elif (add_ic_config == 3):
+        model_params['add_ic'] = [[0, 1, 0, 1, 0, 1, 0, 1, 0], [1, 0, 1, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0]] # 15, 30, 45, 60, 75, 90 percent of GFLOPs - caso com 7 saídas, classificadores mais fracos para verificar se bayes voting realmente lida melhor 
+        print("caso com 7 saídas, classificadores mais fracos para verificar se bayes voting realmente lida melhor ")
+    elif (add_ic_config == 4):
+        model_params['add_ic'] = [[1, 1, 0, 1, 0, 1, 0, 1, 0], [0, 0, 1, 0, 0, 0, 1, 0, 0], [0, 1, 0, 0, 0, 1, 0, 0, 0]] # 15, 30, 45, 60, 75, 90 percent of GFLOPs - caso com 10 saídas. as 3 adicionais no começo
+        print("caso com 10 saídas. as 3 adicionais no começo")
+    elif (add_ic_config == 5):
+        model_params['add_ic'] = [[0, 1, 0, 1, 0, 0, 0, 0, 0], [0, 0, 1, 0, 0, 0, 1, 0, 0], [0, 1, 0, 0, 0, 1, 0, 0, 0]] # 15, 30, 45, 60, 75, 90 percent of GFLOPs - caso com 7 saídas, mas algumas delas mais pro começo
+        print("caso com 7 saídas, mas algumas delas mais pro começo")
+    elif (add_ic_config == 6):
+        model_params['add_ic'] = [[0, 1, 0, 1, 0, 1, 0, 1, 0], [0, 0, 1, 0, 0, 0, 1, 0, 0], [0, 1, 0, 0, 0, 1, 0, 0, 1]] # 15, 30, 45, 60, 75, 90 percent of GFLOPs - caso com 10 saídas, mas algumas delas mais pro começo
+        print("caso com 10 saídas, mas algumas delas mais pro começo")
+    elif (add_ic_config == 7):
+        model_params['add_ic'] = [[1, 1, 1, 1, 1, 1, 1, 1, 1], [0, 0, 1, 0, 0, 0, 1, 0, 0], [0, 1, 0, 0, 0, 1, 0, 0, 1]] # 15, 30, 45, 60, 75, 90 percent of GFLOPs - caso extremo: muitas saídas adicionais no começo
+        print("caso extremo: muitas saídas adicionais no começo")
+
+    print (model_params['add_ic'])
+    print (f"""{sum(sum(element) for element in model_params['add_ic'])+1} exits""")
+    print ("\n\n\n")
+
+
+
 
     model_name = '{}_resnet56'.format(task)
 
     model_params['network_type'] = 'resnet56'
+    model_params['final_head'] = final_head
     model_params['augment_training'] = True
     model_params['init_weights'] = True
 
