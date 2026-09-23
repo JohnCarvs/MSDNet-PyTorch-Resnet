@@ -10,7 +10,7 @@ import network_architectures as arcs
 
 from architectures.CNNs.VGG import VGG
 
-def SDN(args):
+def SDN(args, add_ic_config=0, final_head='linear'):
 
     if args.sdnarch=='vgg16':
 
@@ -18,7 +18,12 @@ def SDN(args):
         args.nBlocks=7
         args.weight_decay= 0.0005
     elif args.sdnarch=='resnet56':
-        model=arcs.create_resnet56( args.task, args.ge)
+        model=arcs.create_resnet56(
+            args.task,
+            args.ge,
+            add_ic_config=add_ic_config,
+            final_head=final_head,
+        )
         args.nBlocks = 7
         args.weight_decay = 0.0001
     elif args.sdnarch == 'wideresnet32_4':

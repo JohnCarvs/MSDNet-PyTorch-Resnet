@@ -67,7 +67,7 @@ def main():
         IM_SIZE = 224
 
     if args.usingsdn:
-        model = SDN(args)
+        model = SDN(args, args.add_ic_config, args.final_head)
     else:
         model = getattr(models, args.arch)(args)
 
@@ -77,7 +77,7 @@ def main():
 
 
     if args.usingsdn:
-        model = SDN(args)
+        model = SDN(args, args.add_ic_config, args.final_head)
     else:
         model = getattr(models, args.arch)(args)
 
@@ -111,7 +111,7 @@ def main():
         model.load_state_dict(state_dict)
 
         if args.evalmode == 'anytime':
-            validate(test_loader, model, criterion)
+            validate(test_loader, model, criterion, args.epochs - 1)
         else:
             dynamic_evaluate(model, test_loader, val_loader, args)
         return
@@ -123,7 +123,7 @@ def main():
 
         train_loss, train_prec1, train_prec5, lr = train(train_loader, model, criterion, optimizer, epoch)
 
-        val_loss, val_prec1, val_prec5 = validate(val_loader, model, criterion)
+        val_loss, val_prec1, val_prec5 = validate(val_loader, model, criterion, epoch)
 
         scores.append(('{}\t{:.3f}' + '\t{:.4f}' * 6)
                       .format(epoch, lr, train_loss, val_loss,
@@ -149,7 +149,7 @@ def main():
     ### Test the final model
 
     print('********** Final prediction results **********')
-    validate(test_loader, model, criterion)
+    validate(test_loader, model, criterion, args.epochs - 1)
 
     return 
 
@@ -159,7 +159,8 @@ def train(train_loader, model, criterion, optimizer, epoch):
     data_time = AverageMeter()
     losses = AverageMeter()
     top1, top5 = [], []
-    for i in range(args.nBlocks):
+    output_count = model.module.num_output if isinstance(model, torch.nn.DataParallel) else model.num_output
+    for i in range(output_count):
         top1.append(AverageMeter())
         top5.append(AverageMeter())
 
@@ -186,16 +187,21 @@ def train(train_loader, model, criterion, optimizer, epoch):
         if not isinstance(output, list):
             output = [output]
 
-        loss = 0.0
-        for j in range(len(output)):
-            loss += criterion(output[j], target_var)
+        num_internal = len(output) - 1
+        max_coeffs = np.linspace(0.15, 0.9, num_internal)
 
-        # average exit losses to prevent gradient blowup.
-        # At MetaGF, instead of giving each exit equal weight,
-        # it learns adaptive weights that decide how much each exit’s
-        # gradient should contribute. This reduces harmful gradient conflicts between
-        # shallow and deep exits, making it more stable.
-        loss = loss / len(output)
+        cur_coeffs = 0.01 + epoch * (max_coeffs / args.epochs)
+        cur_coeffs = np.minimum(cur_coeffs, max_coeffs)
+
+        loss = sum(
+            float(cur_coeffs[j]) * criterion(output[j], target_var)
+            for j in range(num_internal)
+        )
+        loss += criterion(output[-1], target_var)
+
+        #loss = 0.0
+        #for j in range(len(output)):
+        #    loss += criterion(output[j], target_var)
 
         losses.update(loss.item(), input.size(0))
 
@@ -227,71 +233,13 @@ def train(train_loader, model, criterion, optimizer, epoch):
     return losses.avg, top1[-1].avg, top5[-1].avg, running_lr
 
 
-
-
-'''
-def validate(val_loader, model, criterion):
+def validate(val_loader, model, criterion, epoch=0):
     batch_time = AverageMeter()
     losses = AverageMeter()
     data_time = AverageMeter()
     top1, top5 = [], []
-    for i in range(args.nBlocks):
-        top1.append(AverageMeter())
-        top5.append(AverageMeter())
-
-    model.eval()
-
-    end = time.time()
-    with torch.no_grad():
-        for i, (input, target) in enumerate(val_loader):
-            target = target.cuda(device=None)
-            input = input.cuda()
-
-            input_var = torch.autograd.Variable(input)
-            target_var = torch.autograd.Variable(target)
-
-            data_time.update(time.time() - end)
-
-            output = model(input_var)
-            if not isinstance(output, list):
-                output = [output]
-
-            loss = 0.0
-            for j in range(len(output)):
-                loss += criterion(output[j], target_var)
-
-            losses.update(loss.item(), input.size(0))
-
-            for j in range(len(output)):
-                prec1, prec5 = accuracy(output[j].data, target, topk=(1, 5))
-                top1[j].update(prec1.item(), input.size(0))
-                top5[j].update(prec5.item(), input.size(0))
-
-            # measure elapsed time
-            batch_time.update(time.time() - end)
-            end = time.time()
-
-            if i % args.print_freq == 0:
-                print('Epoch: [{0}/{1}]\t'
-                      'Time {batch_time.avg:.3f}\t'
-                      'Data {data_time.avg:.3f}\t'
-                      'Loss {loss.val:.4f}\t'
-                      'Acc@1 {top1.val:.4f}\t'
-                      'Acc@5 {top5.val:.4f}'.format(
-                        i + 1, len(val_loader),
-                        batch_time=batch_time, data_time=data_time,
-                        loss=losses, top1=top1[-1], top5=top5[-1]))
-    for j in range(args.nBlocks):
-        print(' * prec@1 {top1.avg:.3f} prec@5 {top5.avg:.3f}'.format(top1=top1[j], top5=top5[j]))
-    # print(' * prec@1 {top1.avg:.3f} prec@5 {top5.avg:.3f}'.format(top1=top1[-1], top5=top5[-1]))
-    return losses.avg, top1[-1].avg, top5[-1].avg
-'''
-def validate(val_loader, model, criterion):
-    batch_time = AverageMeter()
-    losses = AverageMeter()
-    data_time = AverageMeter()
-    top1, top5 = [], []
-    for i in range(args.nBlocks):
+    output_count = model.module.num_output if isinstance(model, torch.nn.DataParallel) else model.num_output
+    for i in range(output_count):
         top1.append(AverageMeter())
         top5.append(AverageMeter())
 
@@ -311,10 +259,23 @@ def validate(val_loader, model, criterion):
             output, _ = model(input_var)
             if not isinstance(output, list):
                 output = [output]
+            
+            num_internal = len(output) - 1
+            max_coeffs = np.linspace(0.15, 0.9, num_internal)
 
-            loss = 0.0
-            for j in range(len(output)):
-                loss += criterion(output[j], target_var)
+            cur_coeffs = 0.01 + epoch * (max_coeffs / args.epochs)
+            cur_coeffs = np.minimum(cur_coeffs, max_coeffs)
+
+            loss = sum(
+                float(cur_coeffs[j]) * criterion(output[j], target_var)
+                for j in range(num_internal)
+            )
+            loss += criterion(output[-1], target_var)
+
+
+            #loss = 0.0
+            #for j in range(len(output)):
+            #    loss += criterion(output[j], target_var)
 
             losses.update(loss.item(), input.size(0))
 
@@ -337,7 +298,7 @@ def validate(val_loader, model, criterion):
                         i + 1, len(val_loader),
                         batch_time=batch_time, data_time=data_time,
                         loss=losses, top1=top1[-1], top5=top5[-1]))
-    for j in range(args.nBlocks):
+    for j in range(output_count):
         print(' * prec@1 {top1.avg:.3f} prec@5 {top5.avg:.3f}'.format(top1=top1[j], top5=top5[j]))
     # print(' * prec@1 {top1.avg:.3f} prec@5 {top5.avg:.3f}'.format(top1=top1[-1], top5=top5[-1]))
     return losses.avg, top1[-1].avg, top5[-1].avg

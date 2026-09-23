@@ -15,6 +15,9 @@ sdn_exp.add_argument('--task',default='cifar100',type=str,choices=['cifar10','ci
 sdn_exp.add_argument('--ge',default=0,type=int)
 sdn_exp.add_argument('--usingsdn',default=1,type=int)
 sdn_exp.add_argument('--predefinedindex',default='index.pth',type=str)
+sdn_exp.add_argument('--add_ic_config',default=0,type=int)
+sdn_exp.add_argument('--final-head', default='linear', choices=['linear', 'mlp', 'spatial'],
+                     help='final SDN head: linear, mlp, or spatial 2x2 pooling')
 
 
 

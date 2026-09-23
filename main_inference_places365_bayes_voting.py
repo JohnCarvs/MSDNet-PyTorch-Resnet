@@ -109,8 +109,8 @@ elif args.data == 'places365':
 else:
     args.num_classes = 1000
 
-if args.data != 'places365':
-    raise ValueError('This script is Places365-only. Please run with --data places365.')
+#if args.data != 'places365':
+#    raise ValueError('This script is Places365-only. Please run with --data places365.')
 
 import torch
 import torch.nn as nn
@@ -147,7 +147,7 @@ def main():
         IM_SIZE = 224
 
     if args.usingsdn:
-        model = SDN(args)
+        model = SDN(args, args.add_ic_config, args.final_head)
     else:
         model = getattr(models, args.arch)(args)
     n_flops, n_params = measure_model(model, IM_SIZE, IM_SIZE)
@@ -155,7 +155,7 @@ def main():
     del (model)
 
     if args.usingsdn:
-        model = SDN(args)
+        model = SDN(args, args.add_ic_config, args.final_head)
     else:
         model = getattr(models, args.arch)(args)
 
@@ -197,6 +197,7 @@ def main():
 
     # Keep args.nBlocks aligned with the checkpoint/model outputs to avoid
     # logging a phantom extra block with zero metrics.
+    model.eval()
     with torch.no_grad():
         sample_input, _ = next(iter(test_loader_single))
         sample_input = sample_input.cuda()
@@ -749,7 +750,7 @@ def validate_ensemble(val_loader, model, criterion, corruption, severity):
             ensemble_count = 0  # Track how many classifiers we've accumulated
             for j in range(len(output)):
                 # Skip j=0,1 to avoid noise; start ensemble from j=2
-                if j >= 2:
+                if j >= 0:
                     # 累加前面所有classifier的输出
                     cumulative_output += output[j]
                     ensemble_count += 1
@@ -1666,7 +1667,7 @@ def validate_with_bayes_matrix_conformal_prediction(val_loader, model, criterion
                     # output_bayes = torch.tensor(output_bayes).cuda()
 
                     # Multiply with previous result (skip for j=0,1 to avoid noise)
-                    if j >= 2:
+                    if j >= 0:
                         output_bayes = output_bayes * output_bayes_temp #!!!!
                     else:
                         output_bayes = output_bayes_temp

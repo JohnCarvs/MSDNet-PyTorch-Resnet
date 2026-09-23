@@ -103,6 +103,7 @@ class InternalClassifier(nn.Module):
             self.linear = nn.Linear(output_channels*input_size*input_size, num_classes)
             self.forward = self.forward_wo_pooling
         else:
+            # Modificar classificador interno
             red_input_size = int(input_size/red_kernel_size)
             self.max_pool = nn.MaxPool2d(kernel_size=red_kernel_size)
             self.avg_pool = nn.AvgPool2d(kernel_size=red_kernel_size)

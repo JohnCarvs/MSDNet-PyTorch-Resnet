@@ -97,6 +97,9 @@ class ResNet_SDN(nn.Module):
         if self.input_size ==  32: # cifar10
             self.cur_input_size = self.input_size
             init_conv.append(nn.Conv2d(3, self.in_channels, kernel_size=3, stride=1, padding=1, bias=False))
+        elif self.input_size == 224: # places365
+            self.cur_input_size = self.input_size
+            init_conv.append(nn.Conv2d(3, self.in_channels, kernel_size=3, stride=1, padding=1, bias=False))
         else: # tiny imagenet
             self.cur_input_size = int(self.input_size/2)
             init_conv.append(nn.Conv2d(3, self.in_channels, kernel_size=3, stride=2, padding=1, bias=False))
@@ -115,11 +118,23 @@ class ResNet_SDN(nn.Module):
         self.cur_input_size = int(self.cur_input_size/2)
         self.layers.extend(self._make_layer(64, block_id=2, stride=2))
         
-        end_layers = []
-        
-        end_layers.append(nn.AvgPool2d(kernel_size=8))
-        end_layers.append(af.Flatten())
-        end_layers.append(nn.Linear(64*self.block.expansion, self.num_classes))
+        final_head = params.get('final_head', 'linear')
+        pool_size = (2, 2) if final_head == 'spatial' else (1, 1)
+        end_layers = [
+            nn.AdaptiveAvgPool2d(pool_size),
+            af.Flatten(),
+        ]
+        final_features = 64 * self.block.expansion * pool_size[0] * pool_size[1]
+        if final_head == 'mlp':
+            end_layers.extend([
+                nn.Linear(final_features, 256),
+                nn.ReLU(inplace=True),
+                nn.Linear(256, self.num_classes),
+            ])
+        elif final_head == 'spatial':
+            end_layers.append(nn.Linear(final_features, self.num_classes))
+        else:
+            end_layers.append(nn.Linear(final_features, self.num_classes))
         self.end_layers = nn.Sequential(*end_layers)
 
         if self.init_weights:
@@ -239,11 +254,23 @@ class ResNet_SDN_GE(nn.Module):
         self.cur_input_size = int(self.cur_input_size / 2)
         self.layers.extend(self._make_layer(64, block_id=2, stride=2))
 
-        end_layers = []
-
-        end_layers.append(nn.AvgPool2d(kernel_size=8))
-        end_layers.append(af.Flatten())
-        end_layers.append(nn.Linear(64 * self.block.expansion, self.num_classes))
+        final_head = params.get('final_head', 'linear')
+        pool_size = (2, 2) if final_head == 'spatial' else (1, 1)
+        end_layers = [
+            nn.AdaptiveAvgPool2d(pool_size),
+            af.Flatten(),
+        ]
+        final_features = 64 * self.block.expansion * pool_size[0] * pool_size[1]
+        if final_head == 'mlp':
+            end_layers.extend([
+                nn.Linear(final_features, 256),
+                nn.ReLU(inplace=True),
+                nn.Linear(256, self.num_classes),
+            ])
+        elif final_head == 'spatial':
+            end_layers.append(nn.Linear(final_features, self.num_classes))
+        else:
+            end_layers.append(nn.Linear(final_features, self.num_classes))
         self.end_layers = nn.Sequential(*end_layers)
 
         if self.init_weights:
