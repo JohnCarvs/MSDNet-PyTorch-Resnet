@@ -187,6 +187,7 @@ def train(train_loader, model, criterion, optimizer, epoch):
         if not isinstance(output, list):
             output = [output]
 
+        # MetaGF Loss
         num_internal = len(output) - 1
         max_coeffs = np.linspace(0.15, 0.9, num_internal)
 
@@ -199,6 +200,7 @@ def train(train_loader, model, criterion, optimizer, epoch):
         )
         loss += criterion(output[-1], target_var)
 
+        # Old, simple loss
         #loss = 0.0
         #for j in range(len(output)):
         #    loss += criterion(output[j], target_var)

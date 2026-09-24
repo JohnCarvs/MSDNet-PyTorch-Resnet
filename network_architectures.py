@@ -94,7 +94,7 @@ def create_resnet56(task, save_type, get_params=False, add_ic_config=0, final_he
     model_params['block_type'] = 'basic'
     model_params['num_blocks'] = [9,9,9]
     
-    print("Configurações de 'add internal classfier' =======================")
+    print("Settings of 'add internal classfier' =======================")
     
     if (add_ic_config == 0):
         model_params['add_ic'] = [[0, 0, 0, 1, 0, 0, 0, 1, 0], [0, 0, 1, 0, 0, 0, 1, 0, 0], [0, 1, 0, 0, 0, 1, 0, 0, 0]] # 15, 30, 45, 60, 75, 90 percent of GFLOPs

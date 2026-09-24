@@ -118,6 +118,7 @@ class ResNet_SDN(nn.Module):
         self.cur_input_size = int(self.cur_input_size/2)
         self.layers.extend(self._make_layer(64, block_id=2, stride=2))
         
+        # Modifications on the last classifier
         final_head = params.get('final_head', 'linear')
         pool_size = (2, 2) if final_head == 'spatial' else (1, 1)
         end_layers = [
